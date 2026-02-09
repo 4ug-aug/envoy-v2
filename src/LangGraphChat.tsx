@@ -4,11 +4,17 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Spinner } from "@/components/ui/spinner";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useState, useRef, useEffect, type FormEvent } from "react";
 
 interface Message {
-  role: "user" | "ai";
+  role: "user" | "ai" | "system";
   content: string;
+  metadata?: {
+    type?: "token" | "tool_call" | "node_update";
+    node?: string;
+    tool_calls?: any[];
+  };
 }
 
 interface LLMConfig {
@@ -25,11 +31,13 @@ export function LangGraphChat() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "ai",
-      content: "👋 Hello! I'm a LangGraph-powered agent. Ask me anything!"
+      content: "👋 Hello! I'm Envoy, your API assistant. I can help you work with various APIs using my skill system!"
     }
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const [config, setConfig] = useState<LLMConfig | null>(null);
+  const [currentStreamingMessage, setCurrentStreamingMessage] = useState<string>("");
+  const [toolCalls, setToolCalls] = useState<any[]>([]);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -57,9 +65,15 @@ export function LangGraphChat() {
     // Clear input
     form.reset();
     setIsLoading(true);
+    setCurrentStreamingMessage("");
+    setToolCalls([]);
+
+    // Track accumulated message locally to avoid state closure issues
+    let accumulatedMessage = "";
 
     try {
-      const res = await fetch("/api/invoke", {
+      // Use Server-Sent Events for streaming
+      const response = await fetch("/api/stream", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -67,14 +81,79 @@ export function LangGraphChat() {
         body: JSON.stringify({ prompt }),
       });
 
-      const data = await res.json();
-      
-      // Add AI response to chat
-      const aiMessage: Message = { 
-        role: "ai", 
-        content: data.response || "No response received" 
-      };
-      setMessages((prev) => [...prev, aiMessage]);
+      if (!response.body) {
+        throw new Error("No response body");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+
+          const eventMatch = line.match(/^event: (.+)$/m);
+          const dataMatch = line.match(/^data: (.+)$/m);
+
+          if (!eventMatch || !dataMatch) continue;
+
+          const event = eventMatch[1];
+          const data = JSON.parse(dataMatch[1]);
+
+          if (event === "token") {
+            // Accumulate LLM tokens
+            accumulatedMessage += data.content;
+            setCurrentStreamingMessage(accumulatedMessage);
+          } else if (event === "tool_call") {
+            // Show tool call
+            setToolCalls((prev) => [...prev, ...data.tool_calls]);
+            
+            // Add system message for tool calls
+            const toolNames = data.tool_calls.map((tc: any) => tc.name || tc.function?.name).join(", ");
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "system",
+                content: `Calling tools: ${toolNames}`,
+                metadata: { type: "tool_call", tool_calls: data.tool_calls }
+              }
+            ]);
+          } else if (event === "update") {
+            // Show node updates
+            const nodeName = Object.keys(data.data)[0];
+            if (nodeName && nodeName !== "tools") { // Skip "tools" node updates as they're noisy
+              setMessages((prev) => [
+                ...prev,
+                {
+                  role: "system",
+                  content: `Executing: ${nodeName}`,
+                  metadata: { type: "node_update", node: nodeName }
+                }
+              ]);
+            }
+          } else if (event === "done") {
+            // Stream complete - add final message using locally tracked value
+            if (accumulatedMessage.trim()) {
+              setMessages((prev) => [
+                ...prev,
+                { role: "ai", content: accumulatedMessage }
+              ]);
+            }
+            setIsLoading(false);
+          } else if (event === "error") {
+            throw new Error(data.message);
+          }
+        }
+      }
     } catch (error) {
       const errorMessage: Message = {
         role: "ai",
@@ -83,6 +162,8 @@ export function LangGraphChat() {
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
+      setCurrentStreamingMessage("");
+      setToolCalls([]);
       inputRef.current?.focus();
     }
   };
@@ -95,16 +176,54 @@ export function LangGraphChat() {
         scrollContainer.scrollTop = scrollContainer.scrollHeight;
       }
     }
-  }, [messages, isLoading]);
+  }, [messages, isLoading, currentStreamingMessage]);
 
   const clearChat = () => {
     setMessages([
       {
         role: "ai",
-        content: "👋 Hello! I'm a LangGraph-powered agent. Ask me anything!"
+        content: "Hello! I'm Envoy, your API assistant. I can help you work with various APIs using my skill system!"
       }
     ]);
     inputRef.current?.focus();
+  };
+
+  // Helper to render system messages with nice styling
+  const renderSystemMessage = (message: Message) => {
+    if (message.metadata?.type === "tool_call") {
+      const toolNames = message.metadata.tool_calls?.map((tc: any) => tc.name || tc.function?.name) || [];
+      return (
+        <Alert className="max-w-[80%]">
+          <AlertDescription className="flex items-center gap-2">
+            <Badge variant="outline" className="font-mono text-xs">
+              TOOL
+            </Badge>
+            <span className="text-sm">{toolNames.join(", ")}</span>
+          </AlertDescription>
+        </Alert>
+      );
+    }
+
+    if (message.metadata?.type === "node_update") {
+      return (
+        <Alert className="max-w-[80%]">
+          <AlertDescription className="flex items-center gap-2">
+            <Badge variant="secondary" className="font-mono text-xs">
+              NODE
+            </Badge>
+            <span className="text-sm">{message.metadata.node}</span>
+          </AlertDescription>
+        </Alert>
+      );
+    }
+
+    return (
+      <Alert className="max-w-[80%]">
+        <AlertDescription className="text-sm">
+          {message.content}
+        </AlertDescription>
+      </Alert>
+    );
   };
 
   return (
@@ -112,9 +231,9 @@ export function LangGraphChat() {
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle>LangGraph Chat</CardTitle>
+            <CardTitle>Envoy Agent</CardTitle>
             <CardDescription>
-              Chat with a LangGraph-powered AI agent
+              Self-learning API agent with skill-based knowledge
             </CardDescription>
           </div>
           <div className="flex items-center gap-2">
@@ -138,25 +257,40 @@ export function LangGraphChat() {
               <div
                 key={index}
                 className={`flex ${
-                  message.role === "user" ? "justify-end" : "justify-start"
+                  message.role === "user" 
+                    ? "justify-end" 
+                    : message.role === "system"
+                    ? "justify-center"
+                    : "justify-start"
                 }`}
               >
-                <div
-                  className={`rounded-lg px-4 py-2 max-w-[80%] ${
-                    message.role === "user"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted"
-                  }`}
-                >
-                  <p className="text-sm">{message.content}</p>
-                </div>
+                {message.role === "system" ? (
+                  renderSystemMessage(message)
+                ) : (
+                  <div
+                    className={`rounded-lg px-4 py-2 max-w-[80%] ${
+                      message.role === "user"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted"
+                    }`}
+                  >
+                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                  </div>
+                )}
               </div>
             ))}
-            {isLoading && (
+            {currentStreamingMessage && (
+              <div className="flex justify-start">
+                <div className="rounded-lg px-4 py-2 max-w-[80%] bg-muted">
+                  <p className="text-sm whitespace-pre-wrap">{currentStreamingMessage}</p>
+                </div>
+              </div>
+            )}
+            {isLoading && !currentStreamingMessage && (
               <div className="flex justify-start">
                 <div className="rounded-lg px-4 py-2 bg-muted flex items-center gap-2">
                   <Spinner className="h-4 w-4" />
-                  <p className="text-sm text-muted-foreground">Thinking...</p>
+                  <p className="text-sm text-muted-foreground">Processing...</p>
                 </div>
               </div>
             )}
@@ -167,7 +301,7 @@ export function LangGraphChat() {
           <Input
             ref={inputRef}
             name="prompt"
-            placeholder="Type your message..."
+            placeholder="Ask me about APIs or tell me what to do..."
             disabled={isLoading}
             autoFocus
           />
