@@ -107,7 +107,7 @@ export function LangGraphChat() {
           if (!eventMatch || !dataMatch) continue;
 
           const event = eventMatch[1];
-          const data = JSON.parse(dataMatch[1]);
+          const data = JSON.parse(dataMatch[1] as string || "{}");
 
           if (event === "token") {
             // Accumulate LLM tokens

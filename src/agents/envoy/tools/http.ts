@@ -48,6 +48,13 @@ async function makeHttpRequest(params: HttpRequestParams): Promise<HttpResponse>
     }
 
     console.log(`🌐 ${method} ${finalUrl.toString()}`);
+    
+    // Debug headers (redact sensitive info)
+    const debugHeaders = { ...options.headers } as Record<string, string>;
+    if (debugHeaders.Authorization) {
+      debugHeaders.Authorization = debugHeaders.Authorization.substring(0, 15) + "...[REDACTED]";
+    }
+    console.log("Headers:", JSON.stringify(debugHeaders));
 
     // Make request
     const response = await fetch(finalUrl.toString(), options);

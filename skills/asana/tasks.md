@@ -2,6 +2,13 @@
 
 List, create, and update tasks in Asana projects.
 
+## Getting the Project ID
+
+**If you don't have a project_gid**, discover it first:
+1. List workspaces: `GET /workspaces` (see asana/workspaces skill)
+2. List projects: `GET /workspaces/{workspace_gid}/projects` (see asana/projects skill)
+3. Use the project `gid` from the response
+
 ## Get Tasks in a Project
 
 Retrieve all tasks in a specific project.
