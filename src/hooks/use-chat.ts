@@ -7,25 +7,56 @@ export type ChatMessage = {
   isStreaming: boolean;
 };
 
+export type ConnectionStatus = "connecting" | "connected" | "disconnected" | "error";
+
 export function useChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("connecting");
   const sessionIdRef = useRef<string>(crypto.randomUUID());
   const eventSourceRef = useRef<EventSource | null>(null);
+  const reconnectTimeoutRef = useRef<number | null>(null);
+  const reconnectAttemptsRef = useRef(0);
+  const maxReconnectDelay = 30000; // 30 seconds max
 
-  // Connect SSE on mount
-  useEffect(() => {
+  const connectSSE = useCallback(() => {
     const sessionId = sessionIdRef.current;
+
+    // Close existing connection if any
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+
     console.log("[use-chat] Opening SSE connection for session:", sessionId);
+    setConnectionStatus("connecting");
+
     const es = new EventSource(`/api/v1/events?sessionId=${sessionId}`);
     eventSourceRef.current = es;
 
     es.addEventListener("open", () => {
       console.log("[use-chat] SSE connection opened");
+      setConnectionStatus("connected");
+      reconnectAttemptsRef.current = 0; // Reset on successful connection
     });
 
     es.addEventListener("error", (error) => {
       console.error("[use-chat] SSE error:", error);
+      setConnectionStatus("error");
+
+      // Auto-reconnect with exponential backoff
+      const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), maxReconnectDelay);
+      reconnectAttemptsRef.current++;
+
+      console.log(`[use-chat] Reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current})`);
+
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+
+      reconnectTimeoutRef.current = window.setTimeout(() => {
+        connectSSE();
+      }, delay);
     });
 
     es.addEventListener("message", (event) => {
@@ -59,14 +90,45 @@ export function useChat() {
         setIsLoading(false);
       }
     });
+  }, []);
+
+  // Connect SSE on mount
+  useEffect(() => {
+    connectSSE();
 
     return () => {
-      es.close();
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+      }
     };
-  }, []);
+  }, [connectSSE]);
 
   const sendMessage = useCallback(async (content: string) => {
     if (!content.trim() || isLoading) return;
+
+    // Ensure connection is ready before sending
+    const es = eventSourceRef.current;
+    if (!es || es.readyState !== EventSource.OPEN) {
+      console.log("[use-chat] Connection not ready, reconnecting...");
+      connectSSE();
+
+      // Wait up to 5 seconds for connection
+      const startTime = Date.now();
+      while (Date.now() - startTime < 5000) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        if (eventSourceRef.current?.readyState === EventSource.OPEN) {
+          break;
+        }
+      }
+
+      if (eventSourceRef.current?.readyState !== EventSource.OPEN) {
+        console.error("[use-chat] Failed to establish connection");
+        return;
+      }
+    }
 
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
@@ -107,7 +169,7 @@ export function useChat() {
       });
       setIsLoading(false);
     }
-  }, [isLoading]);
+  }, [isLoading, connectionStatus, connectSSE]);
 
-  return { messages, isLoading, sendMessage };
+  return { messages, isLoading, sendMessage, connectionStatus };
 }

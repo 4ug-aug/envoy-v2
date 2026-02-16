@@ -1,12 +1,13 @@
 import { useRef, useEffect, useState, type FormEvent } from "react";
-import { useChat } from "@/hooks/use-chat";
+import { useChat, type ConnectionStatus } from "@/hooks/use-chat";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
 import "./index.css";
 
 export function App() {
-  const { messages, isLoading, sendMessage } = useChat();
+  const { messages, isLoading, sendMessage, connectionStatus } = useChat();
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -25,10 +26,44 @@ export function App() {
     setInput("");
   };
 
+  const getStatusBadge = (status: ConnectionStatus) => {
+    switch (status) {
+      case "connected":
+        return (
+          <Badge variant="default" className="bg-green-500 hover:bg-green-600">
+            <span className="w-1.5 h-1.5 rounded-full bg-white mr-1.5" />
+            Connected
+          </Badge>
+        );
+      case "connecting":
+        return (
+          <Badge variant="secondary">
+            <span className="w-1.5 h-1.5 rounded-full bg-current mr-1.5 animate-pulse" />
+            Connecting
+          </Badge>
+        );
+      case "error":
+        return (
+          <Badge variant="destructive">
+            <span className="w-1.5 h-1.5 rounded-full bg-white mr-1.5" />
+            Reconnecting
+          </Badge>
+        );
+      case "disconnected":
+        return (
+          <Badge variant="outline">
+            <span className="w-1.5 h-1.5 rounded-full bg-current mr-1.5" />
+            Disconnected
+          </Badge>
+        );
+    }
+  };
+
   return (
     <div className="flex flex-col h-screen bg-background">
-      <header className="border-b px-4 py-3 shrink-0">
+      <header className="border-b px-4 py-3 shrink-0 flex items-center justify-between">
         <h1 className="text-lg font-semibold">Envoy</h1>
+        {getStatusBadge(connectionStatus)}
       </header>
 
       <ScrollArea className="flex-1 px-4">
