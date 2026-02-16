@@ -1,7 +1,7 @@
 import { Database } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import { ALL_SCHEMAS } from "./schema";
+import { ALL_SCHEMAS, MIGRATIONS } from "./schema";
 
 const DB_PATH = process.env.DATABASE_PATH ?? "./data/envoy.sqlite";
 
@@ -21,6 +21,13 @@ export function getDb(): Database {
     db = new Database(DB_PATH);
     for (const sql of ALL_SCHEMAS) {
       db.run(sql);
+    }
+    for (const sql of MIGRATIONS) {
+      try {
+        db.run(sql);
+      } catch {
+        // Migration already applied
+      }
     }
   }
   return db;

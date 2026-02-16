@@ -23,4 +23,15 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 `;
 
+/** Safe migration: add conversation_state column if it doesn't exist. */
+export const ADD_CONVERSATION_STATE = `
+ALTER TABLE sessions ADD COLUMN conversation_state TEXT DEFAULT '[]';
+`;
+
 export const ALL_SCHEMAS = [SESSIONS_TABLE, MESSAGES_TABLE];
+
+/**
+ * Migrations that may fail if already applied (e.g. ALTER TABLE ADD COLUMN).
+ * Run these with try/catch.
+ */
+export const MIGRATIONS = [ADD_CONVERSATION_STATE];

@@ -21,7 +21,9 @@ class EventBus {
   }
 
   emit(sessionId: string, payload: unknown): void {
-    this.listeners.get(sessionId)?.forEach((fn) => {
+    const listeners = this.listeners.get(sessionId);
+    console.log(`[EventBus] emit to session ${sessionId}, ${listeners?.size || 0} listeners:`, payload);
+    listeners?.forEach((fn) => {
       try {
         fn(payload);
       } catch (e) {

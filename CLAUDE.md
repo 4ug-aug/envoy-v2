@@ -16,7 +16,9 @@ bun test             # Run tests (bun:test, not jest/vitest)
 
 Bun auto-loads `.env` (no dotenv needed).
 
-- `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` — LLM provider (at least one required)
+- `LLM_API_KEY` — API key for the LLM provider
+- `LLM_BASE_URL` — OpenAI-compatible endpoint (default: `https://openrouter.ai/api/v1`)
+- `LLM_MODEL` — Model identifier (default: `anthropic/claude-sonnet-4`)
 - `DATABASE_PATH` — SQLite file (default: `./data/envoy.sqlite`)
 - `TOOLS_FS_ROOT` — Sandbox root for file tools (default: cwd)
 - `TOOLS_SHELL_ENABLED` — Enable shell tool (default: false)
@@ -38,9 +40,10 @@ Routes are mounted under `/api/v1/` via Hono:
 
 ### Agent Loop (`api/agent/`)
 
-- **processor.ts** — Orchestrates a turn: builds context → calls LLM → (TODO: parse tool calls → execute → loop). Currently single-turn.
-- **llm.ts** — Multi-provider wrapper. Auto-detects OpenAI vs Anthropic by which API key is set. Defaults: `gpt-4o-mini` / `claude-3-5-haiku`.
-- **prompt.ts** — Builds the message array: `[system, ...history, user_message]`.
+- **processor.ts** — Orchestrates a turn using AI SDK `streamText()` with automatic tool calling loop (`maxSteps: 10`). Streams deltas and tool events via EventBus.
+- **provider.ts** — Configurable LLM via `@ai-sdk/openai-compatible`. Works with OpenRouter, Ollama, LM Studio, or any OpenAI-compatible endpoint.
+- **tools.ts** — AI SDK `tool()` wrappers around existing fs/shell implementations.
+- **prompt.ts** — System prompt constant.
 
 ### Tool System (`api/tools/`)
 
@@ -50,7 +53,7 @@ Routes are mounted under `/api/v1/` via Hono:
 
 ### Data Layer (`api/db/`, `api/session/`)
 
-SQLite via `bun:sqlite` (singleton in `client.ts`). Schema auto-initializes on first connection. Two tables: `sessions` and `messages`. Session manager handles CRUD; history module handles message retrieval (last 50 by default) and persistence.
+SQLite via `bun:sqlite` (singleton in `client.ts`). Schema auto-initializes on first connection. Two tables: `sessions` (with `conversation_state` JSON column for full `CoreMessage[]`) and `messages` (human-readable log). Session manager handles CRUD; history module handles message retrieval and conversation state persistence.
 
 ### Event Streaming (`api/lib/event-bus.ts`)
 
@@ -58,7 +61,7 @@ In-memory pub/sub keyed by sessionId. Emits typed events: `start`, `delta` (stre
 
 ### Frontend (`src/`)
 
-React 19 + Tailwind CSS + ShadCN/UI (New York style). UI components live in `src/components/ui/`. Chat interface is not yet built — `App.tsx` is a scaffold. Path alias: `@/*` → `./src/*`.
+React 19 + Tailwind CSS + ShadCN/UI (New York style). UI components live in `src/components/ui/`. Chat interface in `App.tsx` with custom `useChat` hook for SSE streaming. Path alias: `@/*` → `./src/*`.
 
 ## Conventions
 

@@ -10,8 +10,10 @@ import * as history from "../session/history";
 const chat = new Hono();
 
 chat.post("/", async (c) => {
+  console.log("[chat] POST /chat received");
   type Body = { sessionId?: string; message: string };
   const body = (await c.req.json()) as Body;
+  console.log("[chat] Request body:", body);
   const { message } = body;
   let { sessionId } = body;
 
@@ -26,13 +28,20 @@ chat.post("/", async (c) => {
     sessionManager.createSession(sessionId);
   }
 
-  const historyMessages = history.getHistory(sessionId);
+  const conversationState = history.getConversationState(sessionId);
+  console.log("[chat] Calling processTurn for session:", sessionId);
+
   const result = await processTurn({
     sessionId,
     userMessage: message,
-    history: historyMessages,
+    history: conversationState,
   });
+  console.log("[chat] processTurn completed");
 
+  // Save full conversation state (includes tool call/result messages)
+  history.setConversationState(sessionId, result.messages);
+
+  // Also append human-readable user/assistant text to messages table
   history.appendMessage(sessionId, "user", message);
   history.appendMessage(sessionId, "assistant", result.assistantMessage);
 
@@ -42,7 +51,6 @@ chat.post("/", async (c) => {
   return c.json({
     sessionId,
     message: result.assistantMessage,
-    usage: result.usage,
   });
 });
 
