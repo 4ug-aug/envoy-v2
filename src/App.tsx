@@ -93,7 +93,7 @@ export function App() {
                   className={`rounded-lg px-3 py-2 max-w-[80%] text-sm ${
                     msg.role === "user"
                       ? "bg-primary text-primary-foreground whitespace-pre-wrap"
-                      : "bg-muted prose prose-sm dark:prose-invert max-w-none"
+                      : "bg-muted prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-pre:bg-background/50 prose-pre:text-xs"
                   }`}
                 >
                   {msg.role === "assistant" ? (

@@ -6,8 +6,10 @@
 
 import { streamText, type ModelMessage } from "ai";
 import { getModel, getProviderTools } from "./provider";
-import { SYSTEM_PROMPT } from "./prompt";
+import { getSystemPrompt } from "./prompt";
 import { agentTools } from "./tools";
+import { metaTools } from "./meta-tools";
+import { getCustomTools } from "../tools/custom-loader";
 import { eventBus } from "../lib/event-bus";
 
 export type ProcessInput = {
@@ -35,6 +37,9 @@ export async function processTurn(input: ProcessInput): Promise<ProcessResult> {
   const emit = (payload: unknown) => eventBus.emit(sessionId, payload);
   emit({ type: "start" });
 
+  const systemPrompt = getSystemPrompt();
+  const allTools = { ...agentTools, ...metaTools, ...getProviderTools(), ...getCustomTools() };
+
   let fullText = "";
 
   for (let step = 0; step < MAX_STEPS; step++) {
@@ -42,9 +47,9 @@ export async function processTurn(input: ProcessInput): Promise<ProcessResult> {
 
     const result = streamText({
       model: getModel(),
-      system: SYSTEM_PROMPT,
+      system: systemPrompt,
       messages,
-      tools: { ...agentTools, ...getProviderTools() },
+      tools: allTools,
       // maxSteps: 1 — we drive the loop ourselves so the model sees tool
       // results in context on the next iteration rather than relying on the
       // SDK's internal continuation which doesn't update `messages` for us.

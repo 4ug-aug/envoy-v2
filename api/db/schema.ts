@@ -28,7 +28,20 @@ export const ADD_CONVERSATION_STATE = `
 ALTER TABLE sessions ADD COLUMN conversation_state TEXT DEFAULT '[]';
 `;
 
-export const ALL_SCHEMAS = [SESSIONS_TABLE, MESSAGES_TABLE];
+export const CUSTOM_TOOLS_TABLE = `
+CREATE TABLE IF NOT EXISTS custom_tools (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  description TEXT NOT NULL,
+  input_schema TEXT NOT NULL DEFAULT '{}',
+  code TEXT NOT NULL,
+  enabled INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+`;
+
+export const ALL_SCHEMAS = [SESSIONS_TABLE, MESSAGES_TABLE, CUSTOM_TOOLS_TABLE];
 
 /**
  * Migrations that may fail if already applied (e.g. ALTER TABLE ADD COLUMN).
