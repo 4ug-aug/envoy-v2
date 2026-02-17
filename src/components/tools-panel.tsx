@@ -56,7 +56,7 @@ export function ToolsPanel() {
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="builtin" className="space-y-2">
+            <TabsContent value="builtin" className="space-y-2 overflow-y-auto max-h-[calc(100vh-10rem)]">
               {tools.builtIn.map((tool) => (
                 <div key={tool.name} className="flex items-start gap-2 rounded-md border px-3 py-2">
                   <PackageIcon className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
@@ -68,7 +68,7 @@ export function ToolsPanel() {
               ))}
             </TabsContent>
 
-            <TabsContent value="custom" className="space-y-2">
+            <TabsContent value="custom" className="space-y-2 overflow-y-auto">
               {tools.custom.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-8 text-center">
                   No custom tools yet. Ask the agent to create one.
