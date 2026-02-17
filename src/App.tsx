@@ -6,6 +6,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { ItemGroup } from "@/components/ui/item";
 import { ToolCallItem } from "@/components/tool-call-item";
+import { ToolsPanel } from "@/components/tools-panel";
+import { TasksPanel } from "@/components/tasks-panel";
 import ReactMarkdown from "react-markdown";
 import "./index.css";
 
@@ -14,13 +16,33 @@ export function App() {
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll on new messages
+  // Auto-scroll on new messages and during streaming
   useEffect(() => {
     const el = scrollRef.current;
     if (el) {
-      el.scrollTop = el.scrollHeight;
+      // Use requestAnimationFrame to ensure DOM is updated before scrolling
+      requestAnimationFrame(() => {
+        el.scrollTop = el.scrollHeight;
+      });
     }
   }, [messages]);
+
+  // Also scroll on every frame during active streaming for smooth follow
+  useEffect(() => {
+    if (!isLoading) return;
+
+    let animationFrameId: number;
+    const scroll = () => {
+      const el = scrollRef.current;
+      if (el) {
+        el.scrollTop = el.scrollHeight;
+      }
+      animationFrameId = requestAnimationFrame(scroll);
+    };
+
+    animationFrameId = requestAnimationFrame(scroll);
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [isLoading]);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -66,7 +88,11 @@ export function App() {
     <div className="flex flex-col h-screen bg-background">
       <header className="border-b px-4 py-3 shrink-0 flex items-center justify-between">
         <h1 className="text-lg font-semibold">Envoy</h1>
-        {getStatusBadge(connectionStatus)}
+        <div className="flex items-center gap-2">
+          <ToolsPanel />
+          <TasksPanel />
+          {getStatusBadge(connectionStatus)}
+        </div>
       </header>
 
       <ScrollArea className="flex-1 px-4">

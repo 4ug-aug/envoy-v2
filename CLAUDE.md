@@ -47,9 +47,9 @@ Routes are mounted under `/api/v1/` via Hono:
 
 ### Tool System (`api/tools/`)
 
-- **registry.ts** — Central map of tool name → handler. Tools: `read_file`, `write_file`, `list_dir`, `run_shell`.
+- **registry.ts** — Central map of tool name → handler. Tools: `read_file`, `write_file`, `list_dir`, `search_web`.
 - **fs.ts** — File operations sandboxed to `TOOLS_FS_ROOT` with path traversal prevention.
-- **shell.ts** — Gated behind `TOOLS_SHELL_ENABLED`.
+- **web.ts** — Search the web for information.
 
 ### Data Layer (`api/db/`, `api/session/`)
 

@@ -9,6 +9,7 @@ import { getModel, getProviderTools } from "./provider";
 import { getSystemPrompt } from "./prompt";
 import { agentTools } from "./tools";
 import { metaTools } from "./meta-tools";
+import { taskMetaTools } from "./task-meta-tools";
 import { getCustomTools } from "../tools/custom-loader";
 import { eventBus } from "../lib/event-bus";
 
@@ -24,6 +25,7 @@ export type ProcessResult = {
 };
 
 const MAX_STEPS = 10;
+const MAX_TOKENS = 10000;
 
 export async function processTurn(input: ProcessInput): Promise<ProcessResult> {
   const { sessionId, userMessage, history } = input;
@@ -38,7 +40,7 @@ export async function processTurn(input: ProcessInput): Promise<ProcessResult> {
   emit({ type: "start" });
 
   const systemPrompt = getSystemPrompt();
-  const allTools = { ...agentTools, ...metaTools, ...getProviderTools(), ...getCustomTools() };
+  const allTools = { ...agentTools, ...metaTools, ...taskMetaTools, ...getProviderTools(), ...getCustomTools() };
 
   let fullText = "";
 
@@ -50,6 +52,7 @@ export async function processTurn(input: ProcessInput): Promise<ProcessResult> {
       system: systemPrompt,
       messages,
       tools: allTools,
+      maxOutputTokens: MAX_TOKENS,
       // maxSteps: 1 — we drive the loop ourselves so the model sees tool
       // results in context on the next iteration rather than relying on the
       // SDK's internal continuation which doesn't update `messages` for us.

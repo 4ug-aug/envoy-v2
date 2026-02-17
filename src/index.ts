@@ -2,6 +2,7 @@ import { serve } from "bun";
 import { Hono } from "hono";
 import index from "./index.html";
 import API from "../api/index";
+import { initScheduler } from "../api/tasks/scheduler";
 
 const app = new Hono();
 app.route("/api/", API);
@@ -16,3 +17,5 @@ const server = serve({
 });
 
 console.log(`🚀 Server running at ${server.url}`);
+
+initScheduler();
