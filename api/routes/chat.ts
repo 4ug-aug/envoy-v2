@@ -48,6 +48,13 @@ chat.post("/", async (c) => {
   const { getDb } = await import("../db/client");
   getDb().run("UPDATE sessions SET updated_at = ? WHERE id = ?", [Date.now(), sessionId]);
 
+  // Auto-title session on first message
+  const session = sessionManager.getSession(sessionId);
+  if (session && session.title === "New chat") {
+    const title = message.length > 40 ? message.slice(0, 40).trimEnd() + "…" : message.trim();
+    sessionManager.updateSession(sessionId, { title });
+  }
+
   return c.json({
     sessionId,
     message: result.assistantMessage,

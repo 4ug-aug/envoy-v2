@@ -3,6 +3,7 @@ import chatRoutes from "../routes/chat";
 import eventsRoutes from "../routes/events";
 import toolsRoutes from "../routes/tools";
 import tasksRoutes from "../routes/tasks";
+import sessionsRoutes from "../routes/sessions";
 
 const V1Routes = new Hono();
 
@@ -11,5 +12,6 @@ V1Routes.route("/chat", chatRoutes);
 V1Routes.route("/events", eventsRoutes);
 V1Routes.route("/tools", toolsRoutes);
 V1Routes.route("/tasks", tasksRoutes);
+V1Routes.route("/sessions", sessionsRoutes);
 
 export default V1Routes;

@@ -17,29 +17,27 @@ export type ChatMessage = {
 
 export type ConnectionStatus = "connecting" | "connected" | "disconnected" | "error";
 
-export function useChat() {
+export function useChat(sessionId: string, onTurnComplete?: () => void) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("connecting");
-  const sessionIdRef = useRef<string>(crypto.randomUUID());
+  const sessionIdRef = useRef<string>(sessionId);
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
   const reconnectAttemptsRef = useRef(0);
   const maxReconnectDelay = 30000; // 30 seconds max
 
-  const connectSSE = useCallback(() => {
-    const sessionId = sessionIdRef.current;
-
+  const connectSSE = useCallback((sid: string) => {
     // Close existing connection if any
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
       eventSourceRef.current = null;
     }
 
-    console.log("[use-chat] Opening SSE connection for session:", sessionId);
+    console.log("[use-chat] Opening SSE connection for session:", sid);
     setConnectionStatus("connecting");
 
-    const es = new EventSource(`/api/v1/events?sessionId=${sessionId}`);
+    const es = new EventSource(`/api/v1/events?sessionId=${sid}`);
     eventSourceRef.current = es;
 
     es.addEventListener("open", () => {
@@ -63,7 +61,7 @@ export function useChat() {
       }
 
       reconnectTimeoutRef.current = window.setTimeout(() => {
-        connectSSE();
+        connectSSE(sessionIdRef.current);
       }, delay);
     });
 
@@ -134,13 +132,40 @@ export function useChat() {
           return prev;
         });
         setIsLoading(false);
+        onTurnComplete?.();
       }
     });
-  }, []);
+  }, [onTurnComplete]);
 
-  // Connect SSE on mount
+  // When sessionId changes: clear messages, load history, reconnect SSE
   useEffect(() => {
-    connectSSE();
+    sessionIdRef.current = sessionId;
+    reconnectAttemptsRef.current = 0;
+
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+    }
+
+    setMessages([]);
+    setIsLoading(false);
+
+    // Load existing messages for this session
+    fetch(`/api/v1/sessions/${sessionId}/messages`)
+      .then((r) => r.json())
+      .then((rows: { role: string; content: string }[]) => {
+        const loaded: ChatMessage[] = rows.map((row) => ({
+          id: crypto.randomUUID(),
+          role: row.role as "user" | "assistant",
+          content: row.content,
+          isStreaming: false,
+        }));
+        setMessages(loaded);
+      })
+      .catch(() => {
+        // New session — no messages yet, that's fine
+      });
+
+    connectSSE(sessionId);
 
     return () => {
       if (reconnectTimeoutRef.current) {
@@ -148,9 +173,10 @@ export function useChat() {
       }
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
+        eventSourceRef.current = null;
       }
     };
-  }, [connectSSE]);
+  }, [sessionId, connectSSE]);
 
   const sendMessage = useCallback(async (content: string) => {
     if (!content.trim() || isLoading) return;
@@ -159,7 +185,7 @@ export function useChat() {
     const es = eventSourceRef.current;
     if (!es || es.readyState !== EventSource.OPEN) {
       console.log("[use-chat] Connection not ready, reconnecting...");
-      connectSSE();
+      connectSSE(sessionIdRef.current);
 
       // Wait up to 5 seconds for connection
       const startTime = Date.now();
@@ -215,7 +241,7 @@ export function useChat() {
       });
       setIsLoading(false);
     }
-  }, [isLoading, connectionStatus, connectSSE]);
+  }, [isLoading, connectSSE]);
 
   return { messages, isLoading, sendMessage, connectionStatus };
 }

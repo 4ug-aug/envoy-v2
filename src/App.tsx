@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, type FormEvent } from "react";
+import { useRef, useEffect, useState, useCallback, type FormEvent } from "react";
 import { useChat, type ConnectionStatus } from "@/hooks/use-chat";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,19 +8,43 @@ import { ItemGroup } from "@/components/ui/item";
 import { ToolCallItem } from "@/components/tool-call-item";
 import { ToolsPanel } from "@/components/tools-panel";
 import { TasksPanel } from "@/components/tasks-panel";
+import { SessionSidebar, type Session } from "@/components/session-sidebar";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import ReactMarkdown from "react-markdown";
 import "./index.css";
 
 export function App() {
-  const { messages, isLoading, sendMessage, connectionStatus } = useChat();
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string>(() => crypto.randomUUID());
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const fetchSessions = useCallback(async () => {
+    const res = await fetch("/api/v1/sessions");
+    setSessions(await res.json());
+  }, []);
+
+  useEffect(() => {
+    fetchSessions();
+  }, [fetchSessions]);
+
+  const handleNewChat = () => setActiveSessionId(crypto.randomUUID());
+  const handleSelectSession = (id: string) => setActiveSessionId(id);
+  const handleDeleteSession = async (id: string) => {
+    await fetch(`/api/v1/sessions/${id}`, { method: "DELETE" });
+    if (activeSessionId === id) setActiveSessionId(crypto.randomUUID());
+    fetchSessions();
+  };
+
+  const { messages, isLoading, sendMessage, connectionStatus } = useChat(
+    activeSessionId,
+    fetchSessions
+  );
 
   // Auto-scroll on new messages and during streaming
   useEffect(() => {
     const el = scrollRef.current;
     if (el) {
-      // Use requestAnimationFrame to ensure DOM is updated before scrolling
       requestAnimationFrame(() => {
         el.scrollTop = el.scrollHeight;
       });
@@ -85,86 +109,97 @@ export function App() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-background">
-      <header className="border-b px-4 py-3 shrink-0 flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Envoy</h1>
-        <div className="flex items-center gap-2">
-          <ToolsPanel />
-          <TasksPanel />
-          {getStatusBadge(connectionStatus)}
-        </div>
-      </header>
+    <SidebarProvider>
+      <SessionSidebar
+        sessions={sessions}
+        activeSessionId={activeSessionId}
+        onNewChat={handleNewChat}
+        onSelectSession={handleSelectSession}
+        onDeleteSession={handleDeleteSession}
+      />
+      <SidebarInset>
+        <div className="flex flex-col h-screen bg-background">
+          <header className="border-b px-4 py-3 shrink-0 flex items-center justify-between">
+            <h1 className="text-lg font-semibold">Envoy</h1>
+            <div className="flex items-center gap-2">
+              <ToolsPanel />
+              <TasksPanel />
+              {getStatusBadge(connectionStatus)}
+            </div>
+          </header>
 
-      <ScrollArea className="flex-1 px-4">
-        <div ref={scrollRef} className="max-w-2xl mx-auto py-4 space-y-4">
-          {messages.length === 0 && (
-            <p className="text-center text-muted-foreground py-12">
-              Send a message to get started.
-            </p>
-          )}
-          {messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}
-            >
-              {msg.role === "assistant" && msg.toolCalls && msg.toolCalls.length > 0 && (
-                <ItemGroup className="mb-2 w-full max-w-[80%]">
-                  {msg.toolCalls.map((tc) => (
-                    <ToolCallItem key={tc.toolCallId} toolCall={tc} />
-                  ))}
-                </ItemGroup>
+          <ScrollArea className="flex-1 px-4">
+            <div ref={scrollRef} className="max-w-2xl mx-auto py-4 space-y-4">
+              {messages.length === 0 && (
+                <p className="text-center text-muted-foreground py-12">
+                  Send a message to get started.
+                </p>
               )}
-              {(msg.content || msg.isStreaming) && (
+              {messages.map((msg) => (
                 <div
-                  className={`rounded-lg px-3 py-2 max-w-[80%] text-sm ${
-                    msg.role === "user"
-                      ? "bg-primary text-primary-foreground whitespace-pre-wrap"
-                      : "bg-muted prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-pre:bg-background/50 prose-pre:text-xs"
-                  }`}
+                  key={msg.id}
+                  className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}
                 >
-                  {msg.role === "assistant" ? (
-                    <ReactMarkdown
-                      components={{
-                        a: ({ node, ...props }) => (
-                          <a
-                            {...props}
-                            className="text-blue-600 dark:text-blue-400 hover:underline"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          />
-                        ),
-                      }}
-                    >
-                      {msg.content}
-                    </ReactMarkdown>
-                  ) : (
-                    msg.content
+                  {msg.role === "assistant" && msg.toolCalls && msg.toolCalls.length > 0 && (
+                    <ItemGroup className="mb-2 w-full max-w-[80%]">
+                      {msg.toolCalls.map((tc) => (
+                        <ToolCallItem key={tc.toolCallId} toolCall={tc} />
+                      ))}
+                    </ItemGroup>
                   )}
-                  {msg.isStreaming && (
-                    <span className="inline-block w-1.5 h-4 ml-0.5 bg-current animate-pulse align-text-bottom" />
+                  {(msg.content || msg.isStreaming) && (
+                    <div
+                      className={`rounded-lg px-3 py-2 max-w-[80%] text-sm ${
+                        msg.role === "user"
+                          ? "bg-primary text-primary-foreground whitespace-pre-wrap"
+                          : "bg-muted prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-pre:bg-background/50 prose-pre:text-xs"
+                      }`}
+                    >
+                      {msg.role === "assistant" ? (
+                        <ReactMarkdown
+                          components={{
+                            a: ({ node, ...props }) => (
+                              <a
+                                {...props}
+                                className="text-blue-600 dark:text-blue-400 hover:underline"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              />
+                            ),
+                          }}
+                        >
+                          {msg.content}
+                        </ReactMarkdown>
+                      ) : (
+                        msg.content
+                      )}
+                      {msg.isStreaming && (
+                        <span className="inline-block w-1.5 h-4 ml-0.5 bg-current animate-pulse align-text-bottom" />
+                      )}
+                    </div>
                   )}
                 </div>
-              )}
+              ))}
             </div>
-          ))}
-        </div>
-      </ScrollArea>
+          </ScrollArea>
 
-      <div className="border-t px-4 py-3 shrink-0">
-        <form onSubmit={handleSubmit} className="max-w-2xl mx-auto flex gap-2">
-          <Input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Send a message..."
-            disabled={isLoading}
-            autoFocus
-          />
-          <Button type="submit" disabled={isLoading || !input.trim()}>
-            Send
-          </Button>
-        </form>
-      </div>
-    </div>
+          <div className="border-t px-4 py-3 shrink-0">
+            <form onSubmit={handleSubmit} className="max-w-2xl mx-auto flex gap-2">
+              <Input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Send a message..."
+                disabled={isLoading}
+                autoFocus
+              />
+              <Button type="submit" disabled={isLoading || !input.trim()}>
+                Send
+              </Button>
+            </form>
+          </div>
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }
 
