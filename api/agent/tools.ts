@@ -1,18 +1,19 @@
 /**
- * AI SDK tool definitions wrapping existing tool implementations.
+ * AI SDK tool definitions for filesystem operations.
  * Uses jsonSchema() instead of Zod to avoid Zod v4 serialization issues.
+ * Web search is provided by the provider natively (see provider.ts).
  */
 
-import { tool } from "ai";
+import { tool, jsonSchema } from "ai";
 import * as fsTools from "../tools/fs";
-import * as shellTools from "../tools/shell";
-import { z } from "zod";
 
 export const agentTools = {
   read_file: tool({
     description: "Read the contents of a file. Path is relative to the sandbox root.",
-    inputSchema: z.object({
-      path: z.string().describe("Relative file path to read"),
+    inputSchema: jsonSchema<{ path: string }>({
+      type: "object",
+      properties: { path: { type: "string", description: "Relative file path to read" } },
+      required: ["path"],
     }),
     execute: async ({ path }: { path: string }): Promise<string> => {
       try {
@@ -28,9 +29,13 @@ export const agentTools = {
 
   write_file: tool({
     description: "Write content to a file. Path is relative to the sandbox root.",
-    inputSchema: z.object({
-      path: z.string().describe("Relative file path to write"),
-      content: z.string().describe("Content to write"),
+    inputSchema: jsonSchema<{ path: string; content: string }>({
+      type: "object",
+      properties: {
+        path: { type: "string", description: "Relative file path to write" },
+        content: { type: "string", description: "Content to write" },
+      },
+      required: ["path", "content"],
     }),
     execute: async ({ path, content }: { path: string; content: string }): Promise<string> => {
       try {
@@ -44,8 +49,10 @@ export const agentTools = {
 
   list_dir: tool({
     description: "List directory contents. Path is relative to the sandbox root.",
-    inputSchema: z.object({
-      path: z.string().describe("Relative directory path to list (defaults to '.')."),
+    inputSchema: jsonSchema<{ path: string }>({
+      type: "object",
+      properties: { path: { type: "string", description: "Relative directory path to list (defaults to '.')." } },
+      required: ["path"],
     }),
     execute: async ({ path }: { path: string }): Promise<string> => {
       try {
@@ -56,29 +63,6 @@ export const agentTools = {
           return `Error listing directory: ${e.message}`;
         }
         return `Error listing directory: ${String(e)}`;
-      }
-    },
-  }),
-
-  run_shell: tool({
-    description:
-      "Run a shell command. Only available when TOOLS_SHELL_ENABLED=true.",
-    inputSchema: z.object({
-      command: z.string().describe("Shell command to run"),
-    }),
-    execute: async ({ command }: { command: string }): Promise<string> => {
-      try {
-        const result = await shellTools.runCommand(command);
-        const parts: string[] = [];
-        if (result.stdout) parts.push(result.stdout);
-        if (result.stderr) parts.push(`stderr: ${result.stderr}`);
-        parts.push(`exit code: ${result.code}`);
-        return parts.join("\n");
-      } catch (e: unknown) {
-        if (e instanceof Error) {
-          return `Error running shell command: ${e.message}`;
-        }
-        return `Error running shell command: ${String(e)}`;
       }
     },
   }),

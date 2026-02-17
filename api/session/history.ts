@@ -12,10 +12,10 @@ const MAX_HISTORY_MESSAGES = 50;
 export function getHistory(sessionId: string, limit = MAX_HISTORY_MESSAGES): HistoryMessage[] {
   const db = getDb();
   const rows = db
-    .query<{ role: string; content: string }, { session_id: string; limit: number }>(
+    .query<{ role: string; content: string }, [string, number]>(
       "SELECT role, content FROM messages WHERE session_id = ? ORDER BY created_at ASC LIMIT ?"
     )
-    .all({ session_id: sessionId, limit });
+    .all([sessionId, limit]);
   return rows.map((row) => ({ role: row.role as "user" | "assistant" | "system", content: row.content }));
 }
 
@@ -45,10 +45,10 @@ export function compactHistory(_sessionId: string): void {
 export function getConversationState(sessionId: string): ModelMessage[] {
   const db = getDb();
   const row = db
-    .query<{ conversation_state: string }, { id: string }>(
+    .query<{ conversation_state: string }, [string]>(
       "SELECT conversation_state FROM sessions WHERE id = ?"
     )
-    .get({ id: sessionId }) as { conversation_state: string };
+    .get([sessionId]) as { conversation_state: string };
   if (!row?.conversation_state) return [];
   try {
     return JSON.parse(row.conversation_state) as ModelMessage[];

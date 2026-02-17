@@ -4,6 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { ItemGroup } from "@/components/ui/item";
+import { ToolCallItem } from "@/components/tool-call-item";
+import ReactMarkdown from "react-markdown";
 import "./index.css";
 
 export function App() {
@@ -76,20 +79,46 @@ export function App() {
           {messages.map((msg) => (
             <div
               key={msg.id}
-              className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+              className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}
             >
-              <div
-                className={`rounded-lg px-3 py-2 max-w-[80%] whitespace-pre-wrap text-sm ${
-                  msg.role === "user"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted"
-                }`}
-              >
-                {msg.content}
-                {msg.isStreaming && (
-                  <span className="inline-block w-1.5 h-4 ml-0.5 bg-current animate-pulse align-text-bottom" />
-                )}
-              </div>
+              {msg.role === "assistant" && msg.toolCalls && msg.toolCalls.length > 0 && (
+                <ItemGroup className="mb-2 w-full max-w-[80%]">
+                  {msg.toolCalls.map((tc) => (
+                    <ToolCallItem key={tc.toolCallId} toolCall={tc} />
+                  ))}
+                </ItemGroup>
+              )}
+              {(msg.content || msg.isStreaming) && (
+                <div
+                  className={`rounded-lg px-3 py-2 max-w-[80%] text-sm ${
+                    msg.role === "user"
+                      ? "bg-primary text-primary-foreground whitespace-pre-wrap"
+                      : "bg-muted prose prose-sm dark:prose-invert max-w-none"
+                  }`}
+                >
+                  {msg.role === "assistant" ? (
+                    <ReactMarkdown
+                      components={{
+                        a: ({ node, ...props }) => (
+                          <a
+                            {...props}
+                            className="text-blue-600 dark:text-blue-400 hover:underline"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          />
+                        ),
+                      }}
+                    >
+                      {msg.content}
+                    </ReactMarkdown>
+                  ) : (
+                    msg.content
+                  )}
+                  {msg.isStreaming && (
+                    <span className="inline-block w-1.5 h-4 ml-0.5 bg-current animate-pulse align-text-bottom" />
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>

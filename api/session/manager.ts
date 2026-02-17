@@ -24,13 +24,13 @@ export function createSession(id?: string): Session {
 
 export function getSession(id: string): Session | null {
   const db = getDb();
-  const row = db.query<Session, { id: string }>("SELECT * FROM sessions WHERE id = ?").get({ id });
+  const row = db.query<Session, [string]>("SELECT * FROM sessions WHERE id = ?").get([id]);
   return row ?? null;
 }
 
 export function listSessions(): Session[] {
   const db = getDb();
-  return db.query<Session, { order_by: string }>("SELECT * FROM sessions ORDER BY updated_at DESC").all({ order_by: "updated_at DESC" });
+  return db.query<Session, []>("SELECT * FROM sessions ORDER BY updated_at DESC").all([]);
 }
 
 export function updateSession(id: string, updates: { title?: string }): void {

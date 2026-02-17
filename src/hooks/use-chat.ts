@@ -1,10 +1,18 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 
+export type ToolCall = {
+  toolCallId: string;
+  toolName: string;
+  args: Record<string, unknown>;
+  result?: unknown;
+};
+
 export type ChatMessage = {
   id: string;
   role: "user" | "assistant";
   content: string;
   isStreaming: boolean;
+  toolCalls?: ToolCall[];
 };
 
 export type ConnectionStatus = "connecting" | "connected" | "disconnected" | "error";
@@ -71,6 +79,44 @@ export function useChat() {
               ...prev.slice(0, -1),
               { ...last, content: last.content + data.content },
             ];
+          }
+          return prev;
+        });
+      }
+
+      if (data.type === "tool_calls") {
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last?.role === "assistant" && last.isStreaming) {
+            const incoming: ToolCall[] = (data.toolCalls ?? []).map((tc: any) => ({
+              toolCallId: tc.toolCallId,
+              toolName: tc.toolName,
+              args: tc.args ?? {},
+            }));
+            const existing = last.toolCalls ?? [];
+            return [
+              ...prev.slice(0, -1),
+              { ...last, toolCalls: [...existing, ...incoming] },
+            ];
+          }
+          return prev;
+        });
+      }
+
+      if (data.type === "tool_results") {
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last?.role === "assistant" && last.isStreaming) {
+            const resultMap: Record<string, unknown> = {};
+            for (const r of data.toolResults ?? []) {
+              resultMap[r.toolCallId] = r.result;
+            }
+            const updated = (last.toolCalls ?? []).map((tc) =>
+              resultMap[tc.toolCallId] !== undefined
+                ? { ...tc, result: resultMap[tc.toolCallId] }
+                : tc
+            );
+            return [...prev.slice(0, -1), { ...last, toolCalls: updated }];
           }
           return prev;
         });
