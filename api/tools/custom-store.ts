@@ -11,6 +11,7 @@ export type CustomTool = {
   input_schema: string;
   code: string;
   enabled: number;
+  integration_id: string | null;
   created_at: number;
   updated_at: number;
 };
@@ -20,6 +21,7 @@ export type CreateToolInput = {
   description: string;
   input_schema: string;
   code: string;
+  integration_id?: string;
 };
 
 export type UpdateToolInput = {
@@ -33,9 +35,10 @@ export function createTool(input: CreateToolInput): CustomTool {
   const db = getDb();
   const id = crypto.randomUUID();
   const now = Date.now();
+  const integrationId = input.integration_id ?? null;
   db.run(
-    "INSERT INTO custom_tools (id, name, description, input_schema, code, enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?)",
-    [id, input.name, input.description, input.input_schema, input.code, now, now]
+    "INSERT INTO custom_tools (id, name, description, input_schema, code, enabled, integration_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)",
+    [id, input.name, input.description, input.input_schema, input.code, integrationId, now, now]
   );
   return {
     id,
@@ -44,6 +47,7 @@ export function createTool(input: CreateToolInput): CustomTool {
     input_schema: input.input_schema,
     code: input.code,
     enabled: 1,
+    integration_id: integrationId,
     created_at: now,
     updated_at: now,
   };

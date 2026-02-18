@@ -6,24 +6,16 @@
 import { tool, jsonSchema } from "ai";
 import { listEnabledTools } from "./custom-store";
 import { executeCustomTool } from "./custom-executor";
+import { parseToolSchema } from "./schema-utils";
 
 export function getCustomTools(): Record<string, any> {
   const tools: Record<string, any> = {};
 
-  for (const ct of listEnabledTools()) {
+  for (const ct of listEnabledTools().filter((t) => !t.integration_id)) {
     const name = `custom_${ct.name}`;
-    let schema: Record<string, unknown>;
 
-    try {
-      schema = JSON.parse(ct.input_schema);
-    } catch {
-      console.warn(`[custom-loader] Invalid input_schema for tool "${ct.name}", skipping.`);
-      continue;
-    }
-
-    if (!schema.type) {
-      schema.type = "object";
-    }
+    const schema = parseToolSchema(ct.input_schema, ct.name);
+    if (!schema) continue;
 
     const inputSchema = jsonSchema<Record<string, unknown>>(schema as any);
     const code = ct.code;

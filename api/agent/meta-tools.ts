@@ -81,6 +81,11 @@ Use standard JavaScript (no imports/require). Example:
         return `Error: A tool named "${name}" already exists. Use update_tool to modify it.`;
       }
 
+      // Validate input_schema is a JSON Schema object, not an array
+      if (Array.isArray(input_schema)) {
+        return "Error: input_schema must be a JSON Schema object (e.g. { \"type\": \"object\", \"properties\": {} }), not an array.";
+      }
+
       // Validate code syntax
       try {
         new Function("input", "fetch", "env", `"use strict";\nreturn (async () => {\n${code}\n})();`);

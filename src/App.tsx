@@ -8,6 +8,7 @@ import { ItemGroup } from "@/components/ui/item";
 import { ToolCallItem } from "@/components/tool-call-item";
 import { ToolsPanel } from "@/components/tools-panel";
 import { TasksPanel } from "@/components/tasks-panel";
+import { IntegrationsPanel } from "@/components/integrations-panel";
 import { SessionSidebar, type Session } from "@/components/session-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import ReactMarkdown from "react-markdown";
@@ -123,6 +124,7 @@ export function App() {
             <h1 className="text-lg font-semibold">Envoy</h1>
             <div className="flex items-center gap-2">
               <ToolsPanel />
+              <IntegrationsPanel />
               <TasksPanel />
               {getStatusBadge(connectionStatus)}
             </div>

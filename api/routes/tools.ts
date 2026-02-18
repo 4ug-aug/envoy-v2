@@ -20,6 +20,11 @@ const BUILT_IN_TOOLS = [
   { name: "update_scheduled_task", description: "Update a scheduled task's description, cron, or enabled status." },
   { name: "delete_scheduled_task", description: "Delete a scheduled task from the database." },
   { name: "list_scheduled_tasks", description: "List all scheduled tasks." },
+  { name: "create_integration", description: "Create a new integration (named group of tools for an external service)." },
+  { name: "add_integration_tool", description: "Add a tool to an existing integration." },
+  { name: "remove_integration_tool", description: "Remove a tool from an integration." },
+  { name: "delete_integration", description: "Delete an integration and all its tools." },
+  { name: "list_integrations", description: "List all integrations with their tools and config status." },
 ];
 
 const BUILT_IN_NAMES = new Set(BUILT_IN_TOOLS.map((t) => t.name));

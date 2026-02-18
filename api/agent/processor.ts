@@ -10,7 +10,9 @@ import { getSystemPrompt } from "./prompt";
 import { agentTools } from "./tools";
 import { metaTools } from "./meta-tools";
 import { taskMetaTools } from "./task-meta-tools";
+import { integrationMetaTools } from "./integration-meta-tools";
 import { getCustomTools } from "../tools/custom-loader";
+import { getIntegrationToolSet } from "../integrations/loader";
 import { eventBus } from "../lib/event-bus";
 
 export type ProcessInput = {
@@ -40,7 +42,7 @@ export async function processTurn(input: ProcessInput): Promise<ProcessResult> {
   emit({ type: "start" });
 
   const systemPrompt = getSystemPrompt();
-  const allTools = { ...agentTools, ...metaTools, ...taskMetaTools, ...getProviderTools(), ...getCustomTools() };
+  const allTools = { ...agentTools, ...metaTools, ...integrationMetaTools, ...taskMetaTools, ...getProviderTools(), ...getCustomTools(), ...getIntegrationToolSet() };
 
   let fullText = "";
 
